@@ -1,0 +1,6 @@
+0 cycle ACC: 17.42
+1 cycle ACC: 27.86
+2 cycle ACC: 32.55
+3 cycle ACC: 37.1
+4 cycle ACC: 41.52
+5 cycle ACC: 42.09
