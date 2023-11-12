@@ -16,7 +16,7 @@ import argparse
 import models.resnet as resnet
 from models.resnet import vgg11
 from models.query_models import LossNet
-from train_test_V2 import train2, test2
+from train_test_V2 import train2, test2, Linear_Train
 from load_dataset_ALL import load_dataset
 from selection_methods_V2 import *
 from config import *
@@ -26,14 +26,14 @@ parser.add_argument("-l","--lambda_loss",type=float, default=1.2, help="Adjustme
 parser.add_argument("-s","--s_margin", type=float, default=0.1, help="Confidence margin of graph")
 parser.add_argument("-n","--hidden_units", type=int, default=128, help="Number of hidden units of the graph")
 parser.add_argument("-r","--dropout_rate", type=float, default=0.3, help="Dropout rate of the graph neural network")
-parser.add_argument("-d","--dataset", type=str, default="cifar10im", help="")
+parser.add_argument("-d","--dataset", type=str, default="cifar100", help="")
 parser.add_argument("-e","--no_of_epochs", type=int, default=200, help="Number of epochs for the active learner")
-parser.add_argument("-m","--method_type", type=str, default="Random", help="")
+parser.add_argument("-m","--method_type", type=str, default="ALFA-MIX", help="")
 parser.add_argument("-c","--cycles", type=int, default=10, help="Number of active learning cycles")
 parser.add_argument("-t","--total", type=bool, default=False, help="Training on the entire dataset")
 parser.add_argument("-g","--gpu-id", type=int, default=2)
-parser.add_argument("--seed", type=int, default=20)
-parser.add_argument("--dim_emb", type=int, default=512)
+parser.add_argument("--seed", type=int, default=200)
+parser.add_argument("--dim-emb", type=int, default=2048)
 parser.add_argument('--versionSave', type=bool, default=True)
 parser.add_argument("--saveName", type=str, default="SAVE")
 parser.add_argument("--imbalanceRatio", type=int, default=10)
@@ -51,7 +51,6 @@ if __name__ == '__main__':
     torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
-    a = torch.randn(3)
 
     txtname = os.path.basename(__file__[:-3]) + '---' + args.saveName + '.txt'
     filepath = os.path.join('Exp_Result', txtname)
@@ -67,7 +66,7 @@ if __name__ == '__main__':
 
     method = args.method_type
     methods = ['Random', 'UncertainGCN', 'CoreGCN', 'CoreSet', 'lloss','VAAL','TA-VAAL','ALFA-MIX']
-    datasets = ['cifar10','cifar10im', 'cifar100', 'cifar100im', 'fashionmnist', 'fashionmnistim', 'svhn', 'svhnim']
+    datasets = ['cifar10','cifar10im', 'cifar100', 'cifar100im', 'fashionmnist','fashionmnistim','svhn','svhnim','tiny']
     assert method in methods, 'No method %s! Try options %s'%(method, methods)
     assert args.dataset in datasets, 'No dataset %s! Try options %s'%(args.dataset, datasets)
     results = open('results_'+str(args.method_type)+"_"+args.dataset +'_main'+str(args.cycles)+str(args.total)+'.txt','w')
@@ -97,12 +96,15 @@ if __name__ == '__main__':
     #             break
 
     unlabeled_set = [x for x in indices if x not in labeled_set]
+    # _unlabeled_set = list(set(indices) - set(labeled_set)) # Only for Tiny #
+    # unlabeled_set = torch.tensor(_unlabeled_set)[torch.randperm(len(_unlabeled_set))[:45000]].tolist()
 
     train_loader = DataLoader(data_train, batch_size=BATCH, sampler=SubsetRandomSampler(labeled_set), pin_memory=True, drop_last=True)
     test_loader  = DataLoader(data_test, batch_size=BATCH)
     dataloaders  = {'train': train_loader, 'test': test_loader}
 
     for cycle in range(CYCLES):
+        print('Cycle {}/{} || Label set size {}'.format(cycle + 1, CYCLES, len(labeled_set)))
         # Randomly sample 10000 unlabeled data points
         if not args.total:
             random.shuffle(unlabeled_set)
@@ -116,27 +118,29 @@ if __name__ == '__main__':
 
         # Model - create new instance for every cycle so that it resets
         if args.dataset == "fashionmnist" or args.dataset == "fashionmnistim":
-            resnet18    = resnet.ResNet18fm(num_classes=NO_CLASSES).cuda()
+            resnet50 = resnet.ResNet18fm(num_classes=NO_CLASSES).cuda()
         else:
-            resnet18    = resnet.ResNet18(num_classes=NO_CLASSES).cuda()
+            resnet50 = resnet.ResNet50(num_classes=NO_CLASSES).cuda()
         if method == 'lloss' or method == 'TA-VAAL':
             if args.dataset == "fashionmnist" or args.dataset == "fashionmnistim":
                 loss_module = LossNet(feature_sizes=[28, 14, 7, 4]).cuda()
             else:
                 loss_module = LossNet().cuda()
 
-        models      = {'backbone': resnet18}
+        models      = {'backbone': resnet50}
         if method =='lloss' or method == 'TA-VAAL':
-            models = {'backbone': resnet18, 'module': loss_module}
+            models = {'backbone': resnet50, 'module': loss_module}
         torch.backends.cudnn.benchmark = True
 
         # Loss, criterion and scheduler (re)initialization
         criterion      = nn.CrossEntropyLoss(reduction='none')
         optim_backbone = optim.SGD(models['backbone'].parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WDECAY)
+        # sched_backbone = lr_scheduler.MultiStepLR(optim_backbone, milestones=MILESTONES)
+        MAX_LR, div_factor = 0.5, 25.
+        print(f'MAX_LT is {MAX_LR}, div_factor is {div_factor}, BATCH is {BATCH}')
+        sched_backbone = lr_scheduler.OneCycleLR(optim_backbone, MAX_LR, epochs=args.no_of_epochs, steps_per_epoch = len(dataloaders['train']), div_factor=div_factor)
+        optims, scheds = {'backbone': optim_backbone}, {'backbone': sched_backbone}
 
-        sched_backbone = lr_scheduler.MultiStepLR(optim_backbone, milestones=MILESTONES)
-        optimizers = {'backbone': optim_backbone}
-        schedulers = {'backbone': sched_backbone}
         if method == 'lloss' or method == 'TA-VAAL':
             optim_module   = optim.SGD(models['module'].parameters(), lr=LR,
                 momentum=MOMENTUM, weight_decay=WDECAY)
@@ -147,9 +151,11 @@ if __name__ == '__main__':
         # ============================================= COMMENT OUT ================================================ #
         # resnet18.load_state_dict(torch.load('Save/BackboneALL1000.pt'))
         # # Training and testing
-        train2(models, method, criterion, optimizers, schedulers, dataloaders, args.no_of_epochs, EPOCHL)
-        acc = test2(models, EPOCH, method, dataloaders, mode='test')
-        print('Cycle {}/{} || Label set size {}: Test acc {}'.format(cycle+1, CYCLES, len(labeled_set), acc))
+        Linear_Train(models, optims, scheds, dataloaders, args.no_of_epochs)
+        #
+        # train2(models, method, criterion, optimizers, schedulers, dataloaders, args.no_of_epochs, EPOCHL)
+        # acc = test2(models, EPOCH, method, dataloaders, mode='test')
+        # print('Cycle {}/{} || Label set size {}: Test acc {}'.format(cycle+1, CYCLES, len(labeled_set), acc))
         # with open(filepath, 'a') as f:
         #     f.write(str(cycle) + ' cycle ACC: ' + str(acc) + '\n')
         # ============================================= COMMENT OUT ================================================ #

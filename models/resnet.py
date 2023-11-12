@@ -7,6 +7,9 @@ import torch.nn.functional as F
 import numpy as np
 from torch.distributions import Normal
 import math
+from torch import Tensor
+from torchvision.models import resnet
+import torchvision
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -56,7 +59,6 @@ class BasicBlock2(nn.Module):
         out = F.relu(out)
         return out
 
-
 class Bottleneck(nn.Module):
     expansion = 4
 
@@ -84,6 +86,28 @@ class Bottleneck(nn.Module):
         out = F.relu(out)
         return out
 
+class MyBottleneck(resnet.Bottleneck):
+
+    def forward(self, x:Tensor) -> Tensor:
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+
+        return out
 
 class ResNet(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10):
@@ -118,6 +142,20 @@ class ResNet(nn.Module):
         # outl = self.linear(outf)
         out = self.linear(outf)
         return out, outf, [out1, out2, out3, out4]
+
+class MyResNet50(torchvision.models.ResNet):
+
+    def forward(self,x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out1 = self.layer1(out)
+        out2 = self.layer2(out1)
+        out3 = self.layer3(out2)
+        out4 = self.layer4(out3)
+        out = self.avgpool(out4)
+        outf = torch.flatten(out,1)
+        out = self.fc(outf)
+        return out, outf, [out1, out2, out3, out4]
+
 
 class ResNetfm(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10):
@@ -161,11 +199,14 @@ def ResNet18(num_classes = 10):
 def ResNet18fm(num_classes = 10):
     return ResNetfm(BasicBlock, [2,2,2,2], num_classes)
 
-def ResNet34():
-    return ResNet(BasicBlock, [3,4,6,3])
+def ResNet34(num_classes = 10):
+    return ResNet(BasicBlock, [3,4,6,3], num_classes)
 
-def ResNet50():
-    return ResNet(Bottleneck, [3,4,6,3])
+def ResNet50(num_classes = 10):
+    model = MyResNet50(MyBottleneck, [3,4,6,3], num_classes)
+    model.conv1 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
+    model.maxpool = nn.Identity()
+    return model
 
 def ResNet101():
     return ResNet(Bottleneck, [3,4,23,3])

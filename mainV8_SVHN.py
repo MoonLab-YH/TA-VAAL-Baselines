@@ -23,33 +23,24 @@ from config import *
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-l","--lambda_loss",type=float, default=1.2, 
-                    help="Adjustment graph loss parameter between the labeled and unlabeled")
-parser.add_argument("-s","--s_margin", type=float, default=0.1,
-                    help="Confidence margin of graph")
-parser.add_argument("-n","--hidden_units", type=int, default=128,
-                    help="Number of hidden units of the graph")
-parser.add_argument("-r","--dropout_rate", type=float, default=0.3,
-                    help="Dropout rate of the graph neural network")
-parser.add_argument("-d","--dataset", type=str, default="svhn",
-                    help="")
-parser.add_argument("-e","--no_of_epochs", type=int, default=200,
-                    help="Number of epochs for the active learner")
-parser.add_argument("-m","--method_type", type=str, default="TA-VAAL",
-                    help="")
-parser.add_argument("-c","--cycles", type=int, default=10,
-                    help="Number of active learning cycles")
-parser.add_argument("-t","--total", type=bool, default=False,
-                    help="Training on the entire dataset")
+parser.add_argument("-l","--lambda_loss",type=float, default=1.2, help="Adjustment graph loss parameter between the labeled and unlabeled")
+parser.add_argument("-s","--s_margin", type=float, default=0.1, help="Confidence margin of graph")
+parser.add_argument("-n","--hidden_units", type=int, default=128, help="Number of hidden units of the graph")
+parser.add_argument("-r","--dropout_rate", type=float, default=0.3, help="Dropout rate of the graph neural network")
+parser.add_argument("-d","--dataset", type=str, default="svhn", help="")
+parser.add_argument("-e","--no_of_epochs", type=int, default=200, help="Number of epochs for the active learner")
+parser.add_argument("-m","--method_type", type=str, default="TA-VAAL", help="")
+parser.add_argument("-c","--cycles", type=int, default=10, help="Number of active learning cycles")
+parser.add_argument("-t","--total", type=bool, default=False, help="Training on the entire dataset")
 parser.add_argument("-g","--gpu-id", type=int, default=0)
 
 args = parser.parse_args()
+torch.cuda.set_device(args.gpu_id)
+torch.set_num_threads(2)
 
-##
 # Main
 if __name__ == '__main__':
-
-    random_seed = 20
+    random_seed = 200
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.backends.cudnn.deterministic = True

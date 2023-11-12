@@ -41,6 +41,29 @@ class MyDataset(Dataset):
             # Set target and data to dataset
             self.cifar100.targets = targets[imbal_class_indices]
             self.cifar100.data = self.cifar100.data[imbal_class_indices]
+        if self.dataset_name == 'svhnim':
+            self.svhn = SVHN('../svhn', split="train",  download=True, transform=transf)
+            targets = np.array(self.svhn.labels)
+            classes, class_counts = np.unique(targets, return_counts=True)
+            nb_classes = len(classes)
+            class_idxs = [np.where(targets == i)[0] for i in range(nb_classes)]
+            imbal_class_counts = [int(len(i)) for i in class_idxs]
+            for cIdx in range(0,9,2): imbal_class_counts[cIdx] = int(0.1 * imbal_class_counts[cIdx])
+            imbal_class_indices = [class_id[:class_count] for class_id, class_count in zip(class_idxs, imbal_class_counts)]
+            imbal_class_indices = np.hstack(imbal_class_indices)
+            self.svhn.targets = targets[imbal_class_indices]
+            self.svhn.data = self.svhn.data[imbal_class_indices]
+        if self.dataset_name == 'fashionmnistim':
+            self.fmnist = FashionMNIST('../fashionMNIST', train=train_flag, download=True, transform=transf)
+            targets = np.array(self.fmnist.targets)
+            classes, class_counts = np.unique(targets, return_counts=True)
+            nb_classes = len(classes)
+            class_idxs = [np.where(targets == i)[0] for i in range(nb_classes)]
+            imbal_class_counts = [int(1 / kwargs['ir'] * 5000), 5000] * 5
+            imbal_class_indices = [class_id[:class_count] for class_id, class_count in zip(class_idxs, imbal_class_counts)]
+            imbal_class_indices = np.hstack(imbal_class_indices)
+            self.fmnist.targets = targets[imbal_class_indices]
+            self.fmnist.data = self.fmnist.data[imbal_class_indices]
 
     def __getitem__(self, index):
         if self.dataset_name == "cifar10":
@@ -51,9 +74,9 @@ class MyDataset(Dataset):
             data, target = self.cifar100[index]
         if self.dataset_name == "cifar100im":
             data, target = self.cifar100[index]
-        if self.dataset_name == "fashionmnist":
+        if self.dataset_name == "fashionmnist" or self.dataset_name == "fashionmnistim":
             data, target = self.fmnist[index]
-        if self.dataset_name == "svhn":
+        if self.dataset_name == "svhn" or self.dataset_name =='svhnim':
             data, target = self.svhn[index]
         return data, target, index
 
@@ -66,15 +89,15 @@ class MyDataset(Dataset):
             return len(self.cifar100)
         elif self.dataset_name == "cifar100im":
             return len(self.cifar100)
-        elif self.dataset_name == "fashionmnist":
+        elif self.dataset_name == "fashionmnist" or self.dataset_name == "fashionmnistim":
             return len(self.fmnist)
-        elif self.dataset_name == "svhn":
+        elif self.dataset_name == "svhn" or self.dataset_name =='svhnim':
             return len(self.svhn)
 
 # Data
 def load_dataset(dataset, **kwargs):
 
-    if dataset == 'fashionmnist':
+    if dataset == 'fashionmnist' or dataset == 'fashionmnistim':
         train_transform = T.Compose([
             T.RandomHorizontalFlip(),
             T.RandomCrop(size=28, padding=4),
@@ -172,7 +195,7 @@ def load_dataset(dataset, **kwargs):
         no_train = imb_class_idx.shape[0]
         data_train.targets = targets[imb_class_idx]
         data_train.data = data_train.data[imb_class_idx]
-        data_unlabeled = None
+        data_unlabeled = MyDataset(dataset, True, T.Compose([T.ToTensor()]), **kwargs)
         data_test  = FashionMNIST('../fashionMNIST', train=False, download=True, transform=train_transform)
         NO_CLASSES = 10
         adden = ADDENDUM
@@ -199,8 +222,9 @@ def load_dataset(dataset, **kwargs):
         no_train = imb_class_idx.shape[0]
         data_train.targets = targets[imb_class_idx]
         data_train.data = data_train.data[imb_class_idx]
-        data_unlabeled = None
+        data_unlabeled = MyDataset(dataset, True, T.Compose([T.ToTensor()]), **kwargs)
         data_test  = SVHN('../svhn', split='test', download=True, transform=train_transform)
         NO_CLASSES = 10
         adden = ADDENDUM
+
     return data_train, data_unlabeled, data_test, adden, NO_CLASSES, no_train

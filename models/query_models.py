@@ -10,12 +10,13 @@ from torch.nn.modules.module import Module
 class LossNet(nn.Module):
     def __init__(self, feature_sizes=[32, 16, 8, 4], num_channels=[64, 128, 256, 512], interm_dim=128):
         super(LossNet, self).__init__()
-        
+
         self.GAP1 = nn.AvgPool2d(feature_sizes[0])
         self.GAP2 = nn.AvgPool2d(feature_sizes[1])
         self.GAP3 = nn.AvgPool2d(feature_sizes[2])
         self.GAP4 = nn.AvgPool2d(feature_sizes[3])
 
+        num_channels = [256, 512, 1024, 2048]
         self.FC1 = nn.Linear(num_channels[0], interm_dim)
         self.FC2 = nn.Linear(num_channels[1], interm_dim)
         self.FC3 = nn.Linear(num_channels[2], interm_dim)

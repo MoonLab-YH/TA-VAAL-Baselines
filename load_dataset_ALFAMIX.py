@@ -269,7 +269,7 @@ def get_handler(name):
         return DataHandler3
     elif name == 'cifar100':
         return DataHandler3
-    elif name == 'fashionmnist':
+    elif name == 'fashionmnist' or name == 'fashionmnistim':
         return DataHandler3
     elif name == 'domain_net-real':
         return DataHandler4

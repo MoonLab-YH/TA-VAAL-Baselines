@@ -26,7 +26,7 @@ parser.add_argument("-l","--lambda_loss",type=float, default=1.2, help="Adjustme
 parser.add_argument("-s","--s_margin", type=float, default=0.1, help="Confidence margin of graph")
 parser.add_argument("-n","--hidden_units", type=int, default=128, help="Number of hidden units of the graph")
 parser.add_argument("-r","--dropout_rate", type=float, default=0.3, help="Dropout rate of the graph neural network")
-parser.add_argument("-d","--dataset", type=str, default="cifar10im", help="")
+parser.add_argument("-d","--dataset", type=str, default="cifar10", help="")
 parser.add_argument("-e","--no_of_epochs", type=int, default=200, help="Number of epochs for the active learner")
 parser.add_argument("-m","--method_type", type=str, default="Random", help="")
 parser.add_argument("-c","--cycles", type=int, default=10, help="Number of active learning cycles")
@@ -116,18 +116,18 @@ if __name__ == '__main__':
 
         # Model - create new instance for every cycle so that it resets
         if args.dataset == "fashionmnist" or args.dataset == "fashionmnistim":
-            resnet18    = resnet.ResNet18fm(num_classes=NO_CLASSES).cuda()
+            resnet34    = resnet.ResNet18fm(num_classes=NO_CLASSES).cuda()
         else:
-            resnet18    = resnet.ResNet18(num_classes=NO_CLASSES).cuda()
+            resnet34    = resnet.ResNet34(num_classes=NO_CLASSES).cuda()
         if method == 'lloss' or method == 'TA-VAAL':
             if args.dataset == "fashionmnist" or args.dataset == "fashionmnistim":
                 loss_module = LossNet(feature_sizes=[28, 14, 7, 4]).cuda()
             else:
                 loss_module = LossNet().cuda()
 
-        models      = {'backbone': resnet18}
+        models      = {'backbone': resnet34}
         if method =='lloss' or method == 'TA-VAAL':
-            models = {'backbone': resnet18, 'module': loss_module}
+            models = {'backbone': resnet34, 'module': loss_module}
         torch.backends.cudnn.benchmark = True
 
         # Loss, criterion and scheduler (re)initialization

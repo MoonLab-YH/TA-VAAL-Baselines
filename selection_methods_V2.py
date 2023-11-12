@@ -267,7 +267,7 @@ def get_kcg(models, labeled_data_size, unlabeled_loader):
             _, features_batch, _ = models['backbone'](inputs)
             features = torch.cat((features, features_batch), 0)
         feat = features.detach().cpu().numpy()
-        new_av_idx = np.arange(SUBSET,(SUBSET + labeled_data_size))
+        new_av_idx = np.arange(SUBSET, (SUBSET + labeled_data_size))
         sampling = kCenterGreedy(feat)  
         batch = sampling.select_batch_(new_av_idx, ADDENDUM)
         other_idx = [x for x in range(SUBSET) if x not in batch]
@@ -279,6 +279,8 @@ def query_samples2(model, method, data_unlabeled, subset, labeled_set, cycle, ar
 
     if args.dataset == 'cifar100' or args.dataset == 'cifar100im':
         ADDENDUM = 2000
+    else:
+        ADDENDUM = 1000
 
     if method == 'Random':
         arg = np.random.randint(len(kwargs['UL_idces']), size=len(kwargs['UL_idces']))
@@ -287,7 +289,7 @@ def query_samples2(model, method, data_unlabeled, subset, labeled_set, cycle, ar
         # Create unlabeled dataloader for the unlabeled subset
         unlabeled_loader = DataLoader(data_unlabeled, batch_size=BATCH, sampler=SubsetSequentialSampler(subset), pin_memory=True)
         labeled_loader = DataLoader(data_unlabeled, batch_size=BATCH, sampler=SubsetSequentialSampler(labeled_set), pin_memory=True)
-        if args.dataset == 'fashionmnist':
+        if args.dataset == 'fashionmnist' or args.dataset == 'fashionmnistim':
             vae = VAE(28,1,3).cuda()
             discriminator = Discriminator(28).cuda()
         else:
@@ -413,7 +415,7 @@ def query_samples2(model, method, data_unlabeled, subset, labeled_set, cycle, ar
         else:
             ADDENDUM = 1000
         UL_idces = kwargs['UL_idces']
-        if args.dataset == 'fashionmnist':
+        if args.dataset == 'fashionmnist' or args.dataset == 'fashionmnistim':
             test_transform = T.Compose([
                 T.ToTensor(),
                 T.Normalize([0.1307], [0.3081])

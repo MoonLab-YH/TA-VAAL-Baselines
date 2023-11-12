@@ -4,3 +4,7 @@
 3 cycle ACC: 37.1
 4 cycle ACC: 41.52
 5 cycle ACC: 42.09
+6 cycle ACC: 44.87
+7 cycle ACC: 45.73
+8 cycle ACC: 46.3
+9 cycle ACC: 47.39

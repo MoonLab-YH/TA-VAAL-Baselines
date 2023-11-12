@@ -34,7 +34,7 @@ parser.add_argument("-t","--total", type=bool, default=False, help="Training on 
 parser.add_argument("-g","--gpu-id", type=int, default=2)
 parser.add_argument("--seed", type=int, default=20)
 parser.add_argument("--dim_emb", type=int, default=512)
-parser.add_argument('--versionSave', type=bool, default=True)
+parser.add_argument('--versionSave', type=bool, default=False)
 parser.add_argument("--saveName", type=str, default="SAVE")
 parser.add_argument("--imbalanceRatio", type=int, default=10)
 
@@ -81,13 +81,16 @@ if __name__ == '__main__':
     # Load training and testing dataset
     data_train, data_unlabeled, data_test, adden, NO_CLASSES, no_train = load_dataset(args.dataset, ir = args.imbalanceRatio)
     print('The entire datasize is {}'.format(len(data_train)))
+
+    init_label = range(int(0.7 * NO_CLASSES))
+    init_idces = np.concatenate([np.where(np.array(data_train.targets) == i)[0] for i in init_label]).tolist()
+    random.shuffle(init_idces)
+
     ADDENDUM = adden
     NUM_TRAIN = no_train
     indices = list(range(NUM_TRAIN))
-
     random.shuffle(indices)
-    labeled_set = indices[:ADDENDUM]
-
+    labeled_set = init_idces[:ADDENDUM]
     # if 'im' in args.dataset:
     #     while True:
     #         random.shuffle(indices)
@@ -95,7 +98,6 @@ if __name__ == '__main__':
     #         if min(np.bincount(np.array(data_train.targets[labeled_set]))) >= 1:
     #             print(f'clsBincount : {np.bincount(np.array(data_train.targets[labeled_set]))}')
     #             break
-
     unlabeled_set = [x for x in indices if x not in labeled_set]
 
     train_loader = DataLoader(data_train, batch_size=BATCH, sampler=SubsetRandomSampler(labeled_set), pin_memory=True, drop_last=True)

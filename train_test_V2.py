@@ -5,6 +5,8 @@ import numpy as np
 import torchvision.transforms as T
 import models.resnet as resnet
 import torch.nn as nn
+from torch.cuda.amp import autocast, GradScaler
+import torch.nn.functional as F
 ##
 # Loss Prediction Loss
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
@@ -127,6 +129,57 @@ def train_epoch(models, method, criterion, optimizers, dataloaders, epoch, epoch
         if method == 'lloss' or method == 'TA-VAAL':
             optimizers['module'].step()
     return loss
+
+def test(models, epoch, method, dataloaders, mode='val'):
+    assert mode == 'val' or mode == 'test'
+    models['backbone'].eval()
+    if method == 'lloss':
+        models['module'].eval()
+
+    total = 0
+    correct = 0
+    with torch.no_grad():
+        for (inputs, labels) in dataloaders[mode]:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
+
+            scores, _, _ = models['backbone'](inputs)
+            _, preds = torch.max(scores.data, 1)
+            total += labels.size(0)
+            correct += (preds == labels).sum().item()
+
+    return 100 * correct / total
+
+def train_AMP_epoch(models, optimizers, schedulers, dataloaders):
+    models['backbone'].train()
+    lossList, accList = [], []
+    scaler = GradScaler()
+    for data in dataloaders['train']:
+        inputs, labels = data[0].cuda(), data[1].cuda()
+        with autocast(enabled=True):
+            scores, embedding, features = models['backbone'](inputs)
+            loss = F.cross_entropy(scores, labels)
+        scaler.scale(loss).backward()
+        scaler.step(optimizers['backbone'])
+        scaler.update()
+        optimizers['backbone'].zero_grad()
+        schedulers['backbone'].step()
+        target_acc = (scores.argmax(dim=-1) == labels).float().mean()
+        lossList.append(loss.item())
+        accList.append(target_acc)
+    return torch.tensor(lossList).mean(), torch.tensor(accList).mean()
+
+def Linear_Train(models, optimizers, schedulers, dataloaders, num_epochs, **kwargs):
+    print('>> Train a model via a linear classifier')
+    pbar = tqdm(range(num_epochs))
+    for epoch in pbar:
+        # loss, acc = train_epoch(models, optimizers, schedulers, dataloaders)
+        loss, acc = train_AMP_epoch(models, optimizers, schedulers, dataloaders)
+        pbar.set_postfix({'loss': loss, 'trAcc': acc})
+        if epoch == num_epochs - 1:
+            acc = test(models, epoch, None, dataloaders, mode='test')
+            print('Linear Classifier Acc: {:.3f}'.format(acc))
+    print('>> Finished.')
 
 def train2(models, method, criterion, optimizers, schedulers, dataloaders, num_epochs, epoch_loss):
     print('>> Train a Model.')
